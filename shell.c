@@ -17,6 +17,7 @@ typedef struct { // 커맨드 구조체
 } COMMAND;
 
 struct sigaction act;
+static int IS_BACKGROUND=0;
 
 int cmd_cd( int argc, char* argv[] ){ //cd : change directory
     if( argc == 1 ){
@@ -43,6 +44,19 @@ static COMMAND builtin_cmds[] =
   { "cd", "change directory", cmd_cd },
   { "exit", "exit this shell", cmd_exit },
 };
+
+int parse_background(char *cmd)
+{
+	int i;
+
+    for(i=0; i < strlen(cmd); i++)
+        if(cmd[i] == '&')
+        {
+            cmd[i] = ' ';
+            return 1;
+        }
+	return 0;
+}
 
 int makeargv(char *s, const char *delimiters, char** argvp, int MAX_LIST)
 {
@@ -105,6 +119,35 @@ void commend_execvp(char *cmdlist)
 }
 
 void commend_grp(char *cmdgrp){
+  char* cmdlist[10];
+  int i=0;
+	int count = 0;
+	int pfd[2];
+  sigset_t set;
+
+	setpgid(0,0);
+ 	if(!IS_BACKGROUND)
+        tcsetpgrp(STDIN_FILENO, getpid());
+
+    sigfillset(&set);
+    sigprocmask(SIG_UNBLOCK,&set,NULL);
+
+    if((count = makeargv(cmdgrp, "|", cmdlist, 10)) <= 0)
+        fatal("makeargv_cmdgrp error");
+
+	for(i=0; i<count-1; i++)
+    {
+		pipe(pfd);
+		switch(fork())
+		{
+			case -1: fatal("fork error");
+            case  0: close(pfd[0]);
+                dup2(pfd[1], STDOUT_FILENO);
+                commend_execvp(cmdlist[i]);
+            default: close(pfd[1]);
+                dup2(pfd[0], STDIN_FILENO);
+		}
+	}
 	commend_execvp(cmdlist[i]);
 }
 
@@ -141,6 +184,8 @@ void commend(char* cmdline){
         }
       }
 
+      IS_BACKGROUND = parse_background(cmdgrptemp);
+
       switch(pid=fork())
       {
           case -1:
@@ -148,6 +193,10 @@ void commend(char* cmdline){
           case  0:
               commend_grp(cmdgrptemp);
           default:
+              if(IS_BACKGROUND) break;
+              waitpid(pid, NULL, 0);
+              tcsetpgrp(STDIN_FILENO, getpgid(0));
+              fflush(stdout);
       }
     }
 }
