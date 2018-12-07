@@ -18,25 +18,7 @@ typedef struct { // 커맨드 구조체
 
 struct sigaction act;
 
-int cmd_cd( int argc, char* argv[] ){ //cd : change directory
-    if( argc == 1 ){
-      chdir( getenv( "HOME" ) );
-    }
-
-    else if( argc == 2 ){
-        if( chdir( argv[1] ) )
-            printf( "No directory\n" );
-    }
-    else{
-      printf( "USAGE: cd [dir]\n" );
-    }
-    return TRUE;
-}
-
-static COMMAND builtin_cmds[] =
-{
-  { "cd", "change directory", cmd_cd },
-};
+static COMMAND builtin_cmds[] ={};
 
 int makeargv(char *s, const char *delimiters, char** argvp, int MAX_LIST)
 {
@@ -94,7 +76,6 @@ void commend_execvp(char *cmdlist)
     if(makeargv(cmdlist, " \t", cmdargs, 10) <= 0)
 		fatal("makeargv_cmdargs error");
 
-    execvp(cmdargs[0], cmdargs); // 5
     fatal("exec error");
 }
 
