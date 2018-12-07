@@ -17,49 +17,8 @@ typedef struct { // 커맨드 구조체
 } COMMAND;
 
 struct sigaction act;
-static int IS_BACKGROUND=0;
 
-int cmd_cd( int argc, char* argv[] ){ //cd : change directory
-    if( argc == 1 ){
-      chdir( getenv( "HOME" ) );
-    }
-
-    else if( argc == 2 ){
-        if( chdir( argv[1] ) )
-            printf( "No directory\n" );
-    }
-    else{
-      printf( "USAGE: cd [dir]\n" );
-    }
-    return TRUE;
-}
-
-int cmd_exit( int argc, char* argv[] ){
-    exit(0);
-    return TRUE;
-}
-
-static COMMAND builtin_cmds[] =
-{
-    { "cd", "change directory", cmd_cd },
-    { "exit", "exit this shell", cmd_exit },
-
-};
-
-int parse_background(char *cmd)
-{
-	int i;
-
-    for(i=0; i < strlen(cmd); i++)
-        if(cmd[i] == '&')
-        {
-            cmd[i] = ' ';
-            return 1;
-        }
-
-
-	return 0;
-}
+static COMMAND builtin_cmds[] ={};
 
 int makeargv(char *s, const char *delimiters, char** argvp, int MAX_LIST)
 {
@@ -110,81 +69,17 @@ int getargs(char *cmd, char **argv) {
     return narg;
 }
 
-void parse_redirect(char* cmd)
-{
-	char *arg;
-	int cmdlen = strlen(cmd);
-	int fd, i;
-
-	for(i = cmdlen-1;i >= 0;i--)
-	{
-		switch(cmd[i])
-		{
-			case '<':
-				arg = strtok(&cmd[i+1], " \t");
-				if( (fd = open(arg, O_RDONLY | O_CREAT, 0644)) < 0)
-					fatal("file open error");
-				dup2(fd, STDIN_FILENO);
-				close(fd);
-				cmd[i] = '\0';
-				break;
-			case '>':
-				arg = strtok(&cmd[i+1], " \t");
-                if( (fd = open(arg, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0)
-					fatal("file open error");
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-                cmd[i] = '\0';
-				break;
-			default:break;
-		}
-	}
-
-}
-
 void commend_execvp(char *cmdlist)
 {
     char* cmdargs[10];
 
-    parse_redirect(cmdlist);
-
     if(makeargv(cmdlist, " \t", cmdargs, 10) <= 0)
 		fatal("makeargv_cmdargs error");
 
-    execvp(cmdargs[0], cmdargs);
     fatal("exec error");
 }
 
 void commend_grp(char *cmdgrp){
-  char* cmdlist[10];
-  int i=0;
-	int count = 0;
-	int pfd[2];
-  sigset_t set;
-
-	setpgid(0,0);
- 	if(!IS_BACKGROUND)
-        tcsetpgrp(STDIN_FILENO, getpid());
-
-    sigfillset(&set);
-    sigprocmask(SIG_UNBLOCK,&set,NULL);
-
-    if((count = makeargv(cmdgrp, "|", cmdlist, 10)) <= 0)
-        fatal("makeargv_cmdgrp error");
-
-	for(i=0; i<count-1; i++)
-    {
-		pipe(pfd);
-		switch(fork())
-		{
-			case -1: fatal("fork error");
-            case  0: close(pfd[0]);
-                dup2(pfd[1], STDOUT_FILENO);
-                commend_execvp(cmdlist[i]);
-            default: close(pfd[1]);
-                dup2(pfd[0], STDIN_FILENO);
-		}
-	}
 	commend_execvp(cmdlist[i]);
 }
 
@@ -221,8 +116,6 @@ void commend(char* cmdline){
         }
       }
 
-      IS_BACKGROUND = parse_background(cmdgrptemp);
-
       switch(pid=fork())
       {
           case -1:
@@ -230,26 +123,8 @@ void commend(char* cmdline){
           case  0:
               commend_grp(cmdgrptemp);
           default:
-              if(IS_BACKGROUND) break;
-              waitpid(pid, NULL, 0);
-              tcsetpgrp(STDIN_FILENO, getpgid(0));
-              fflush(stdout);
       }
     }
-}
-
-void terminor(){
-	int fd;
-	struct termios init_attr, new_attr;
-	fd=open(ttyname(fileno(stdin)),O_RDWR);
-	tcgetattr(fd,&init_attr);
-	new_attr=init_attr;
-	new_attr.c_cc[VINTR]=3;
-	new_attr.c_cc[VQUIT]=26;
-	if(tcsetattr(fd,TCSANOW,&new_attr)!=0){
-		fprintf(stderr,"Don't set\n");
-	}
-	close(fd);
 }
 
 int main() {
@@ -271,13 +146,7 @@ int main() {
     printf("shell [%s]$ ", get_current_dir_name() );
     fgets(buf, BUFSIZ, stdin);
     buf[ strlen(buf) -1] ='\0';
-    if(strcmp(buf,"terminor")==0){
-			terminor();
-      printf("quit -> ^Z\n");
-		}
-    else {
-      commend(buf);
-    }
+    commend(buf);
   }
   return 0;
 }
