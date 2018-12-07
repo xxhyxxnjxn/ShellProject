@@ -33,9 +33,15 @@ int cmd_cd( int argc, char* argv[] ){ //cd : change directory
     return TRUE;
 }
 
+int cmd_exit( int argc, char* argv[] ){
+    exit(0);
+    return TRUE;
+}
+
 static COMMAND builtin_cmds[] =
 {
   { "cd", "change directory", cmd_cd },
+  { "exit", "exit this shell", cmd_exit },
 };
 
 int makeargv(char *s, const char *delimiters, char** argvp, int MAX_LIST)
@@ -146,6 +152,20 @@ void commend(char* cmdline){
     }
 }
 
+void terminor(){
+	int fd;
+	struct termios init_attr, new_attr;
+	fd=open(ttyname(fileno(stdin)),O_RDWR);
+	tcgetattr(fd,&init_attr);
+	new_attr=init_attr;
+	new_attr.c_cc[VINTR]=3;
+	new_attr.c_cc[VQUIT]=26;
+	if(tcsetattr(fd,TCSANOW,&new_attr)!=0){
+		fprintf(stderr,"Don't set\n");
+	}
+	close(fd);
+}
+
 int main() {
   int i;
 	sigset_t set;
@@ -165,7 +185,13 @@ int main() {
     printf("shell [%s]$ ", get_current_dir_name() );
     fgets(buf, BUFSIZ, stdin);
     buf[ strlen(buf) -1] ='\0';
-    commend(buf);
+    if(strcmp(buf,"terminor")==0){
+			terminor();
+      printf("quit -> ^Z\n");
+		}
+    else {
+      commend(buf);
+    }
   }
   return 0;
 }
