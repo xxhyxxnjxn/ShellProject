@@ -107,9 +107,42 @@ int getargs(char *cmd, char **argv) {
     return narg;
 }
 
+void parse_redirect(char* cmd)
+{
+	char *arg;
+	int cmdlen = strlen(cmd);
+	int fd, i;
+
+	for(i = cmdlen-1;i >= 0;i--)
+	{
+		switch(cmd[i])
+		{
+			case '<':
+				arg = strtok(&cmd[i+1], " \t");
+				if( (fd = open(arg, O_RDONLY | O_CREAT, 0644)) < 0)
+					fatal("file open error");
+				dup2(fd, STDIN_FILENO);
+				close(fd);
+				cmd[i] = '\0';
+				break;
+			case '>':
+				arg = strtok(&cmd[i+1], " \t");
+                if( (fd = open(arg, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0)
+					fatal("file open error");
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                cmd[i] = '\0';
+				break;
+			default:break;
+		}
+	}
+}
+
 void commend_execvp(char *cmdlist)
 {
     char* cmdargs[10];
+
+    parse_redirect(cmdlist);
 
     if(makeargv(cmdlist, " \t", cmdargs, 10) <= 0)
 		fatal("makeargv_cmdargs error");
